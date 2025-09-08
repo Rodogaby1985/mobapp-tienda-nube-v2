@@ -1,3 +1,4 @@
+// src/routes/authRoutes.js v3.0 (VARIANTE DOMICILIO)
 const express = require('express');
 const router = express.Router();
 const oauthClient = require('../utils/oauthClient');
@@ -56,3 +57,4 @@ router.get('/oauth_callback', async (req, res) => {
 });
 
 module.exports = router;
+
