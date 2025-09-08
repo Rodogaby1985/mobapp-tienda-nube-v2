@@ -1,4 +1,4 @@
-// src/routes/authRoutes.js v3.0
+// src/routes/authRoutes.js v3.0 (VARIANTE SUCURSAL)
 const express = require('express');
 const router = express.Router();
 const oauthClient = require('../utils/oauthClient');
@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 const crypto = require('crypto');
 
 router.get('/', (req, res) => {
-    res.send("Tu API de Shipping Carrier de Tienda Nube está funcionando. Accede a /install para comenzar la configuración.");
+    res.send("API Shipping Carrier SUCURSAL funcionando. Ir a /install para instalar en la tienda.");
 });
 
 router.get('/install', (req, res) => {
@@ -15,27 +15,26 @@ router.get('/install', (req, res) => {
     req.session.oauth_state = state;
 
     const tiendaNubeInstallUrl = `https://www.tiendanube.com/apps/${process.env.TIENDA_NUBE_CLIENT_ID}/authorize`;
-    
-    logger.info(`Redirigiendo a URL de instalación de Tienda Nube: ${tiendaNubeInstallUrl}`);
+    logger.info(`[SUCURSAL] Redirigiendo a instalación: ${tiendaNubeInstallUrl}`);
     res.redirect(tiendaNubeInstallUrl);
 });
 
 router.get('/oauth_callback', async (req, res) => {
-    logger.info(`[DEBUG] Solicitud recibida en /oauth_callback. Query: ${JSON.stringify(req.query)}`);
+    logger.info(`[SUCURSAL][DEBUG] Callback OAuth Query: ${JSON.stringify(req.query)}`);
     const { code, state, error, error_description } = req.query;
 
     if (error) {
-        logger.error(`Error en callback de OAuth: ${error} - ${error_description}`);
+        logger.error(`[SUCURSAL] Error OAuth: ${error} - ${error_description}`);
         return res.status(400).send(`Error de Tienda Nube: ${error_description || error}`);
     }
 
     if (state !== req.session.oauth_state) {
-        logger.error("Error de estado OAuth: Discrepancia.");
+        logger.error("[SUCURSAL] Estado OAuth inválido.");
         return res.status(400).send("Error de seguridad: estado inválido.");
     }
 
     if (!code) {
-        logger.error("Código de autorización no recibido en el callback.");
+        logger.error("[SUCURSAL] Falta code en callback.");
         return res.status(400).send("Falta el código de autorización.");
     }
 
@@ -48,23 +47,21 @@ router.get('/oauth_callback', async (req, res) => {
         );
 
         const accessToken = tokenData.access_token;
-        const storeId = tokenData.user_id; 
+        const storeId = tokenData.user_id;
 
         if (!accessToken || !storeId) {
-            logger.error(`No se recibió access_token o store_id en la respuesta del token: ${JSON.stringify(tokenData)}`);
+            logger.error(`[SUCURSAL] Respuesta token inválida: ${JSON.stringify(tokenData)}`);
             return res.status(500).send("Error al obtener token o ID de tienda.");
         }
 
         req.session.access_token = accessToken;
         req.session.store_id = storeId;
-        
-        logger.info(`OAuth exitoso para store_id: ${storeId}. Access Token obtenido.`);
+        logger.info(`[SUCURSAL] OAuth OK store_id=${storeId}`);
 
-        logger.info("Esperando 5 segundos antes de registrar el Shipping Carrier principal...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        logger.info("[SUCURSAL] Esperando 5s antes de registrar carrier...");
+        await new Promise(r => setTimeout(r, 5000));
 
-        // --- Lógica para registrar UN ÚNICO transportista principal ---
-        const mainCarrierName = "Mobapp Express";
+        const mainCarrierName = "Mobapp Sucursal";
         const mainCarrierInfo = await tiendaNubeService.registerShippingCarrier(
             storeId,
             accessToken,
@@ -72,47 +69,46 @@ router.get('/oauth_callback', async (req, res) => {
             mainCarrierName
         );
         const mainCarrierId = mainCarrierInfo.id;
-        logger.info(`Transportista principal '${mainCarrierName}' registrado con ID: ${mainCarrierId}`);
+        logger.info(`[SUCURSAL] Carrier principal '${mainCarrierName}' ID=${mainCarrierId}`);
 
-        // --- Lógica para crear las múltiples opciones de envío bajo ese transportista ---
+        // Solo opciones SUCURSAL (types forzados a 'ship')
         const optionsToCreate = [
-            { code: "ANDREANI_DOM", name: "ANDREANI A DOMICILIO", types: "ship" },
-            { code: "ANDREANI_SUC", name: "ANDREANI A SUCURSAL", types: "pickup" },
-            { code: "CA_DOM", name: "CORREO ARGENTINO A DOMICILIO", types: "ship" },
-            { code: "CA_SUC", name: "CORREO ARGENTINO A SUCURSAL", types: "pickup" },
-            { code: "OCA_DOM", name: "OCA A DOMICILIO", types: "ship" },
-            { code: "OCA_SUC", name: "OCA A SUCURSAL", types: "pickup" },
-            { code: "URBANO_DOM", name: "URBANO A DOMICILIO", types: "ship" },
-            { code: "ANDREANI_BIGGER_DOM", name: "ANDREANI BIGGER A DOM", types: "ship" },
+            { code: "ANDREANI_SUC", name: "ANDREANI A SUCURSAL", types: "ship" },
+            { code: "CA_SUC", name: "CORREO ARGENTINO A SUCURSAL", types: "ship" },
+            { code: "OCA_SUC", name: "OCA A SUCURSAL", types: "ship" },
         ];
 
         for (const option of optionsToCreate) {
             try {
-                await tiendaNubeService.createCarrierOption(storeId, accessToken, mainCarrierId, {
-                    code: option.code,
-                    name: option.name,
-                    types: option.types,
-                    additional_days: 0,
-                    additional_cost: 0,
-                    allow_free_shipping: true,
-                    active: true
-                });
-                logger.info(`Opción de Carrier '${option.name}' creada exitosamente bajo el ID de carrier principal: ${mainCarrierId}`);
-            } catch (optionError) {
-                logger.error(`Error al crear la opción '${option.name}': ${optionError.message}`);
+                await tiendaNubeService.createCarrierOption(
+                    storeId,
+                    accessToken,
+                    mainCarrierId,
+                    {
+                        code: option.code,
+                        name: option.name,
+                        types: option.types,
+                        additional_days: 0,
+                        additional_cost: 0,
+                        allow_free_shipping: true,
+                        active: true
+                    }
+                );
+                logger.info(`[SUCURSAL] Opción '${option.name}' creada.`);
+            } catch (e) {
+                logger.error(`[SUCURSAL] Error creando opción '${option.name}': ${e.message}`);
             }
         }
-        // --- Fin de la lógica para opciones de envío ---
 
         res.status(200).send(`
-            <h1>¡El Shipping Carrier '${mainCarrierName}' ha sido registrado exitosamente en Tienda Nube!</h1>
-            <p>Se crearon las siguientes modalidades: ${optionsToCreate.map(opt => opt.name).join(', ')}</p>
-            <p>Ahora Tienda Nube consultará esta URL para las tarifas: ${process.env.PUBLIC_API_URL}/api/shipping_rates</p>
-            <p><strong>Ve al checkout de tu tienda para probarlo.</strong></p>
+            <h1>Carrier '${mainCarrierName}' instalado (SUCURSAL)</h1>
+            <p>Opciones creadas: ${optionsToCreate.map(o => o.name).join(', ')}</p>
+            <p>Endpoint tarifas: ${process.env.PUBLIC_API_URL}/api/shipping_rates</p>
+            <p>Probar en checkout.</p>
         `);
-    } catch (error) {
-        logger.error(`Error en el proceso de OAuth o registro del carrier: ${error.message}`, error);
-        res.status(500).send(`Error durante la instalación de la aplicación: ${error.message}`);
+    } catch (err) {
+        logger.error(`[SUCURSAL] Error instalación: ${err.message}`, err);
+        res.status(500).send(`Error durante la instalación: ${err.message}`);
     }
 });
 
