@@ -1,0 +1,14 @@
+# Node dependencies
+node_modules/
+npm-debug.log
+.DS_Store
+*.log
+
+# Entorno local
+.env
+.env.*
+!/.env.example
+!/.env.suc.example
+
+# Claves y credenciales sensibles
+*service-account*.json
