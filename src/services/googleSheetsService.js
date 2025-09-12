@@ -17,7 +17,20 @@ const RATE_SHEET_NAMES = [
 
 const getSheetsClient = async () => {
   if (sheetsClient) return sheetsClient;
-  const credentialsPath = path.resolve(process.env.GCP_CREDENTIALS_PATH);
+  
+  let credentials;
+
+if (process.env.GCP_CREDENTIALS_JSON) {
+  // En producción (Coolify), leemos las credenciales desde la variable de entorno.
+  credentials = JSON.parse(process.env.GCP_CREDENTIALS_JSON);
+} else if (process.env.GCP_CREDENTIALS_PATH) {
+  // Para tu desarrollo local, seguimos usando la ruta al archivo.
+  credentials = require(process.env.GCP_CREDENTIALS_PATH);
+} else {
+  // Si no se encuentra ninguna, lanzamos un error claro.
+  throw new Error('Credenciales de Google Cloud no encontradas. Define GCP_CREDENTIALS_JSON o GCP_CREDENTIALS_PATH.');
+}
+  
   const auth = new google.auth.GoogleAuth({
     keyFile: credentialsPath,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
@@ -94,3 +107,4 @@ module.exports = {
   getShippingRatesFromSheet,
   getSheetsClient
 };
+
